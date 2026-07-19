@@ -1,0 +1,42 @@
+import yt_dlp
+import os
+import requests
+
+DOWNLOAD_FOLDER = "downloads"
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+
+def expand_tiktok_url(url):
+    if "vt.tiktok.com" in url or "vm.tiktok.com" in url:
+        try:
+            response = requests.get(url, allow_redirects=True, timeout=10)
+            return response.url
+        except Exception:
+            return url
+    return url
+
+def download_video(url):
+
+    # Expand TikTok short links automatically
+    url = expand_tiktok_url(url)
+
+    # Clean TikTok URLs
+    if "tiktok.com" in url:
+        url = url.split("?")[0]
+
+    ydl_opts = {
+        "format": "best[ext=mp4]/best",
+        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(title)s.%(ext)s"),
+        "noplaylist": True,
+        "quiet": True,
+        "no_warnings": True,
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+
+        filename = ydl.prepare_filename(info)
+
+        if not os.path.exists(filename):
+            filename = os.path.splitext(filename)[0] + ".mp4"
+
+        return filename
