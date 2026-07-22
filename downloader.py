@@ -16,11 +16,17 @@ def expand_tiktok_url(url):
     return url
 
 
-def download_video(url):
+def clean_url(url):
     url = expand_tiktok_url(url)
 
     if "tiktok.com" in url:
         url = url.split("?")[0]
+
+    return url
+
+
+def download_video(url):
+    url = clean_url(url)
 
     ydl_opts = {
         "format": "best[ext=mp4]/best",
@@ -42,10 +48,7 @@ def download_video(url):
 
 
 def download_audio(url):
-    url = expand_tiktok_url(url)
-
-    if "tiktok.com" in url:
-        url = url.split("?")[0]
+    url = clean_url(url)
 
     ydl_opts = {
         "format": "bestaudio/best",
