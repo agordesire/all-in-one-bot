@@ -7,16 +7,19 @@ from aiogram.types import (
     CallbackQuery,
     FSInputFile,
 )
-from downloader import download_video
+from downloader import download_video, download_audio
 import asyncio
 import os
 
 # ==========================
-TOKEN="8639003033:AAEsWrrhb89ubCylJhnk3H1frhqyyXa0F2c"
+TOKEN = "8639003033:AAEsWrrhb89ubCylJhnk3H1frhqyyXa0F2c"
 # ==========================
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
+
+# Store users waiting for audio links
+audio_mode = set()
 
 # ========= START =========
 @dp.message(CommandStart())
@@ -54,7 +57,9 @@ async def start(message: Message):
 
     await message.answer(
         "👋 Welcome to *All In One Bot!*\n\n"
-        "📥 Just send me a YouTube, TikTok, Instagram, Facebook or X link and I'll download it automatically.",
+        "📥 Send any YouTube, TikTok, Instagram, Facebook or X link.\n\n"
+        "🎬 Send normally for video.\n"
+        "🎵 Tap Audio first to download MP3.",
         parse_mode="Markdown",
         reply_markup=keyboard,
     )
@@ -62,8 +67,10 @@ async def start(message: Message):
 # ========= AUDIO =========
 @dp.callback_query(F.data == "audio")
 async def audio(callback: CallbackQuery):
+    audio_mode.add(callback.from_user.id)
+
     await callback.message.answer(
-        "🎵 Audio conversion is coming soon."
+        "🎵 Send the video link you want as MP3."
     )
     await callback.answer()
 
@@ -85,7 +92,7 @@ async def profile(callback: CallbackQuery):
 @dp.callback_query(F.data == "settings")
 async def settings(callback: CallbackQuery):
     await callback.message.answer(
-        "⚙️ Settings will be available soon."
+        "⚙️ Settings coming soon."
     )
     await callback.answer()
 
@@ -93,8 +100,7 @@ async def settings(callback: CallbackQuery):
 @dp.callback_query(F.data == "help")
 async def help(callback: CallbackQuery):
     await callback.message.answer(
-        "📖 Just paste a supported video link.\n\n"
-        "Supported:\n"
+        "📖 Supported websites:\n\n"
         "• YouTube\n"
         "• TikTok\n"
         "• Instagram\n"
@@ -107,9 +113,7 @@ async def help(callback: CallbackQuery):
 @dp.callback_query(F.data == "about")
 async def about(callback: CallbackQuery):
     await callback.message.answer(
-        "🤖 All In One Bot\n\n"
-        "Version 1.0\n"
-        "Developed with Python & Aiogram."
+        "🤖 All In One Bot\nVersion 1.1"
     )
     await callback.answer()
 
@@ -138,7 +142,35 @@ async def receive_link(message: Message):
     if not any(site in url for site in supported):
         return
 
-    wait = await message.answer("⏳ Downloading...")
+    # ---------- AUDIO ----------
+    if message.from_user.id in audio_mode:
+
+        audio_mode.remove(message.from_user.id)
+
+        wait = await message.answer("🎵 Downloading audio...")
+
+        try:
+            file_path = download_audio(url)
+
+            audio = FSInputFile(file_path)
+
+            await message.answer_audio(
+                audio=audio,
+                caption="✅ MP3 Download Complete!"
+            )
+
+            await wait.delete()
+
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+        except Exception as e:
+            await wait.edit_text(f"❌ {e}")
+
+        return
+
+    # ---------- VIDEO ----------
+    wait = await message.answer("⏳ Downloading video...")
 
     try:
         file_path = download_video(url)
@@ -147,7 +179,7 @@ async def receive_link(message: Message):
 
         await message.answer_video(
             video=video,
-            caption="✅ Download complete!"
+            caption="✅ Download Complete!"
         )
 
         await wait.delete()
@@ -156,9 +188,7 @@ async def receive_link(message: Message):
             os.remove(file_path)
 
     except Exception as e:
-        await wait.edit_text(
-            f"❌ Download failed.\n\n{e}"
-        )
+        await wait.edit_text(f"❌ {e}")
 
 # ========= RUN =========
 async def main():
